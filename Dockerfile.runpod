@@ -53,7 +53,7 @@ RUN curl -fsSL -o /app/voice-sample.mp3 \
     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" || true
 RUN mkdir -p /cache /voices /data/long_text_jobs
 
-ENV PORT=4123
+ENV PORT=80
 ENV HOST=0.0.0.0
 ENV DEVICE=cuda
 ENV MODEL_CACHE_DIR=/cache
@@ -66,8 +66,8 @@ ENV MAX_CHUNK_LENGTH=200
 ENV MAX_TOTAL_LENGTH=2000
 ENV ENABLE_MEMORY_MONITORING=true
 
-EXPOSE 4123
+EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=30s --start-period=900s --retries=5 \
-  CMD curl -f http://localhost:4123/ping || exit 1
+  CMD curl -f http://localhost:80/ping || exit 1
 
 CMD ["python", "main.py"]
