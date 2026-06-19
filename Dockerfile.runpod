@@ -20,16 +20,34 @@ RUN git clone --depth 1 --branch stable https://github.com/travisvn/chatterbox-t
     && pip install --no-cache-dir \
        fastapi "uvicorn[standard]" python-dotenv python-multipart requests psutil \
        pydantic pydub sse-starlette resemble-perth librosa==0.10.2 \
+       transformers einops safetensors accelerate \
     && pip install --no-cache-dir --no-deps \
        "chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@v0.1.2" \
     && rm -rf /src
 
-RUN python -c "\
-from pathlib import Path; \
-p = Path('main.py'); \
-t = p.read_text(); \
-snip = '\n\n@app.get(\"/ping\")\nasync def runpod_ping():\n    return {\"status\": \"healthy\"}\n'; \
-p.write_text(t.replace('app = FastAPI()', 'app = FastAPI()' + snip, 1)) if '/ping' not in t else None"
+# RunPod LB requires GET /ping on the FastAPI app (app/main.py), not the CLI entrypoint.
+RUN python - <<'PY'
+from pathlib import Path
+
+p = Path("app/main.py")
+text = p.read_text()
+if "runpod_ping" not in text:
+    block = """
+from fastapi.responses import Response
+
+@app.get("/ping")
+async def runpod_ping():
+    from app.core.tts_model import is_ready
+    if is_ready():
+        return {"status": "healthy"}
+    return Response(status_code=204)
+"""
+    anchor = "app.include_router(api_router)"
+    if anchor not in text:
+        raise SystemExit("app/main.py layout changed; update RunPod /ping patch")
+    text = text.replace(anchor, anchor + block, 1)
+    p.write_text(text)
+PY
 
 RUN curl -fsSL -o /app/voice-sample.mp3 \
     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" || true
