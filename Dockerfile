@@ -12,10 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# PyTorch CPU — matched pair (avoids aoti_torch_abi_version crash)
+# PyTorch CPU — 2.6.0 matched pair (2.5.1 segfaulted on model load locally)
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
-       torch==2.5.1 torchaudio==2.5.1 \
+       torch==2.6.0 torchaudio==2.6.0 \
        --index-url https://download.pytorch.org/whl/cpu
 
 # Pin numpy/scipy BEFORE librosa/perth/chatterbox (fixes sph_legendre_p ufunc crash)
@@ -29,6 +29,8 @@ RUN git clone --depth 1 --branch stable https://github.com/travisvn/chatterbox-t
        pydantic pydub sse-starlette resemble-perth librosa==0.10.2 \
     && pip install --no-cache-dir --no-deps \
        "chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@v0.1.2" \
+    && pip install --no-cache-dir \
+       transformers==4.46.3 s3tokenizer conformer diffusers accelerate huggingface_hub \
     && rm -rf /src
 
 RUN python -c "\
