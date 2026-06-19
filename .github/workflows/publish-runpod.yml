@@ -38,22 +38,35 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          PKG_ID=$(gh api graphql -f query='
+          echo "Org packages:"
+          gh api graphql -f query='
             query {
-              repository(owner: "RoseBludd", name: "genius-voice-chatterbox") {
-                packages(first: 20) {
+              organization(login: "RoseBludd") {
+                packages(first: 30, packageType: DOCKER) {
                   nodes { id name }
                 }
               }
-            }' --jq '.data.repository.packages.nodes[] | select(.name=="chatterbox-tts-runpod" or .name=="genius-voice-chatterbox") | .id' | head -1)
-          if [ -z "$PKG_ID" ]; then
-            echo "Package nodes:"
-            gh api graphql -f query='
-              query {
-                repository(owner: "RoseBludd", name: "genius-voice-chatterbox") {
-                  packages(first: 20) { nodes { id name } }
+            }' || true
+          PKG_ID=$(gh api graphql -f query='
+            query {
+              organization(login: "RoseBludd") {
+                packages(first: 30, packageType: DOCKER) {
+                  nodes { id name }
                 }
-              }'
+              }
+            }' --jq '.data.organization.packages.nodes[] | select(.name=="chatterbox-tts-runpod") | .id' | head -1)
+          if [ -z "$PKG_ID" ]; then
+            PKG_ID=$(gh api graphql -f query='
+              query {
+                viewer {
+                  packages(first: 30, packageType: DOCKER) {
+                    nodes { id name }
+                  }
+                }
+              }' --jq '.data.viewer.packages.nodes[] | select(.name=="chatterbox-tts-runpod") | .id' | head -1)
+          fi
+          if [ -z "$PKG_ID" ]; then
+            echo "No package id found"
             exit 1
           fi
           echo "Setting public: $PKG_ID"
