@@ -1,4 +1,5 @@
-# Chatterbox TTS API for Railway (official layout from travisvn/chatterbox-tts-api)
+# Chatterbox TTS API for Railway — stable CPU build (non-multilingual)
+# Multilingual @exp branch crashes on CPU-only hosts (resemble-ai/chatterbox issue).
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -13,11 +14,11 @@ WORKDIR /app
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-RUN git clone --depth 1 https://github.com/travisvn/chatterbox-tts-api.git /src \
+RUN git clone --depth 1 --branch stable https://github.com/travisvn/chatterbox-tts-api.git /src \
     && cp -r /src/app /app/app \
     && cp /src/main.py /src/requirements.txt /app/ \
     && pip install --no-cache-dir fastapi "uvicorn[standard]" python-dotenv python-multipart requests psutil pydub sse-starlette \
-    && pip install --no-cache-dir git+https://github.com/travisvn/chatterbox-multilingual.git@exp \
+    && pip install --no-cache-dir chatterbox-tts==0.1.2 \
     && rm -rf /src
 
 RUN curl -fsSL -o /app/voice-sample.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" || true
@@ -33,6 +34,7 @@ ENV EXAGGERATION=0.5
 ENV CFG_WEIGHT=0.5
 ENV TEMPERATURE=0.8
 ENV MAX_CHUNK_LENGTH=280
+ENV MAX_TOTAL_LENGTH=3000
 
 EXPOSE 4123
 HEALTHCHECK --interval=30s --timeout=30s --start-period=600s --retries=5 \
