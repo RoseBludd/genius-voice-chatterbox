@@ -21,7 +21,7 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/build-push-action@v6
@@ -33,7 +33,30 @@ jobs:
             ghcr.io/rosebludd/chatterbox-tts-runpod:latest
             ghcr.io/rosebludd/chatterbox-tts-runpod:${{ github.sha }}
 
-      - name: Make GHCR package public (RunPod must pull without auth)
-        run: gh api --method PATCH /orgs/RoseBludd/packages/container/chatterbox-tts-runpod/visibility -f visibility=public
+      - name: Make GHCR package public (RunPod pulls without auth)
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          PKG="chatterbox-tts-runpod"
+          echo "Listing container packages for org ${OWNER}..."
+          gh api "/orgs/${OWNER}/packages?package_type=container" --jq '.[].name' || true
+          for API in \
+            "/orgs/${OWNER}/packages/container/${PKG}/visibility" \
+            "/user/packages/container/${PKG}/visibility"; do
+            echo "Trying PATCH ${API}"
+            if gh api --method PATCH "${API}" -f visibility=public; then
+              echo "Package is now public via ${API}"
+              exit 0
+            fi
+          done
+          echo "::error::Could not set package visibility to public"
+          exit 1
+
+      - name: Verify anonymous pull metadata
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://ghcr.io/v2/rosebludd/chatterbox-tts-runpod/tags/list")
+          echo "GHCR tags list HTTP ${code}"
+          test "${code}" = "200"
