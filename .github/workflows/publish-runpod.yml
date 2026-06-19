@@ -8,10 +8,6 @@ on:
       - .github/workflows/publish-runpod.yml
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,9 +16,8 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: genius_substrates
+          password: ${{ secrets.DOCKER_HUB_REGISTRY_CREDENTIAL }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -30,36 +25,12 @@ jobs:
           file: Dockerfile.runpod
           push: true
           tags: |
-            ghcr.io/rosebludd/chatterbox-tts-runpod:latest
-            ghcr.io/rosebludd/chatterbox-tts-runpod:${{ github.sha }}
+            genius_substrates/chatterbox-tts-runpod:latest
+            genius_substrates/chatterbox-tts-runpod:${{ github.sha }}
 
-      - name: Make GHCR package public
-        run: |
-          set +e
-          sleep 5
-          TOKEN="${PACKAGES_TOKEN:-${{ github.token }}}"
-          for PKG in chatterbox-tts-runpod; do
-            echo "PATCH visibility public: ${PKG}"
-            code=$(curl -s -o /tmp/vis.json -w "%{http_code}" -X PATCH \
-              -H "Authorization: Bearer ${TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/user/packages/container/${PKG}/visibility" \
-              -d '{"visibility":"public"}')
-            echo "HTTP ${code}: $(cat /tmp/vis.json)"
-            if [ "$code" = "204" ] || [ "$code" = "200" ]; then exit 0; fi
-          done
-          echo "::warning::Could not set GHCR public via API (needs PAT with write:packages). Run locally:"
-          echo "  gh auth refresh -s read:packages,write:packages"
-          echo "  gh api --method PATCH /user/packages/container/chatterbox-tts-runpod/visibility -f visibility=public"
-          exit 0
-        env:
-          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-
-      - name: Verify anonymous pull metadata
-        continue-on-error: true
+      - name: Verify Docker Hub tag exists
         run: |
           code=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://ghcr.io/v2/rosebludd/chatterbox-tts-runpod/tags/list")
-          echo "GHCR tags list HTTP ${code}"
+            "https://hub.docker.com/v2/repositories/genius_substrates/chatterbox-tts-runpod/tags/latest")
+          echo "Docker Hub latest tag HTTP ${code}"
           test "${code}" = "200"
