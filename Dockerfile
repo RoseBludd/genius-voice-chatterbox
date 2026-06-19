@@ -1,5 +1,6 @@
-# Chatterbox TTS API for Railway — stable CPU build (non-multilingual)
-# Multilingual @exp branch crashes on CPU-only hosts (resemble-ai/chatterbox issue).
+# Chatterbox TTS API for Railway — stable CPU (non-multilingual)
+# Pin torch+torchaudio together; unpinned CPU wheels caused:
+#   ImportError: _torchaudio.abi3.so: undefined symbol: aoti_torch_abi_version
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -11,15 +12,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Install matched PyTorch CPU wheels first (must stay <2.7 for chatterbox-tts 0.1.2)
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+    && pip install --no-cache-dir \
+       torch==2.5.1 torchaudio==2.5.1 \
+       --index-url https://download.pytorch.org/whl/cpu
 
 RUN git clone --depth 1 --branch stable https://github.com/travisvn/chatterbox-tts-api.git /src \
     && cp -r /src/app /app/app \
-    && cp /src/main.py /src/requirements.txt /app/ \
-    && pip install --no-cache-dir fastapi "uvicorn[standard]" python-dotenv python-multipart requests psutil pydub sse-starlette \
-    && pip install --no-cache-dir chatterbox-tts==0.1.2 \
+    && cp /src/main.py /app/ \
+    && pip install --no-cache-dir \
+       fastapi "uvicorn[standard]" python-dotenv python-multipart requests psutil pydub sse-starlette \
+       resemble-perth pydantic \
+    && pip install --no-cache-dir --no-deps \
+       "chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@v0.1.2" \
     && rm -rf /src
+
+# Verify imports before image is published (fail build early on ABI issues)
+RUN python -c "import torch, torchaudio; from chatterbox.tts import ChatterboxTTS; print('chatterbox-ok', torch.__version__, torchaudio.__version__)"
 
 RUN curl -fsSL -o /app/voice-sample.mp3 "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" || true
 RUN mkdir -p /cache /voices /data/long_text_jobs
