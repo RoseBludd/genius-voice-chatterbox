@@ -33,26 +33,36 @@ jobs:
             ghcr.io/rosebludd/chatterbox-tts-runpod:latest
             ghcr.io/rosebludd/chatterbox-tts-runpod:${{ github.sha }}
 
-      - name: Make GHCR package public (RunPod pulls without auth)
+      - name: Make GHCR package public (GraphQL)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
-          PKG="chatterbox-tts-runpod"
-          echo "Listing container packages for org ${OWNER}..."
-          gh api "/orgs/${OWNER}/packages?package_type=container" --jq '.[].name' || true
-          for API in \
-            "/orgs/${OWNER}/packages/container/${PKG}/visibility" \
-            "/user/packages/container/${PKG}/visibility"; do
-            echo "Trying PATCH ${API}"
-            if gh api --method PATCH "${API}" -f visibility=public; then
-              echo "Package is now public via ${API}"
-              exit 0
-            fi
-          done
-          echo "::error::Could not set package visibility to public"
-          exit 1
+          PKG_ID=$(gh api graphql -f query='
+            query {
+              repository(owner: "RoseBludd", name: "genius-voice-chatterbox") {
+                packages(first: 20) {
+                  nodes { id name }
+                }
+              }
+            }' --jq '.data.repository.packages.nodes[] | select(.name=="chatterbox-tts-runpod" or .name=="genius-voice-chatterbox") | .id' | head -1)
+          if [ -z "$PKG_ID" ]; then
+            echo "Package nodes:"
+            gh api graphql -f query='
+              query {
+                repository(owner: "RoseBludd", name: "genius-voice-chatterbox") {
+                  packages(first: 20) { nodes { id name } }
+                }
+              }'
+            exit 1
+          fi
+          echo "Setting public: $PKG_ID"
+          gh api graphql -f query='
+            mutation($id: ID!) {
+              updatePackageVisibility(input: { packageId: $id, visibility: PUBLIC }) {
+                clientMutationId
+              }
+            }' -f id="$PKG_ID"
 
       - name: Verify anonymous pull metadata
         run: |
