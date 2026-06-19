@@ -33,49 +33,22 @@ jobs:
             ghcr.io/rosebludd/chatterbox-tts-runpod:latest
             ghcr.io/rosebludd/chatterbox-tts-runpod:${{ github.sha }}
 
-      - name: Make GHCR package public (GraphQL)
+      - name: Make GHCR package public (user REST API)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          echo "Org packages:"
-          gh api graphql -f query='
-            query {
-              organization(login: "RoseBludd") {
-                packages(first: 30, packageType: DOCKER) {
-                  nodes { id name }
-                }
-              }
-            }' || true
-          PKG_ID=$(gh api graphql -f query='
-            query {
-              organization(login: "RoseBludd") {
-                packages(first: 30, packageType: DOCKER) {
-                  nodes { id name }
-                }
-              }
-            }' --jq '.data.organization.packages.nodes[] | select(.name=="chatterbox-tts-runpod") | .id' | head -1)
-          if [ -z "$PKG_ID" ]; then
-            PKG_ID=$(gh api graphql -f query='
-              query {
-                viewer {
-                  packages(first: 30, packageType: DOCKER) {
-                    nodes { id name }
-                  }
-                }
-              }' --jq '.data.viewer.packages.nodes[] | select(.name=="chatterbox-tts-runpod") | .id' | head -1)
-          fi
-          if [ -z "$PKG_ID" ]; then
-            echo "No package id found"
-            exit 1
-          fi
-          echo "Setting public: $PKG_ID"
-          gh api graphql -f query='
-            mutation($id: ID!) {
-              updatePackageVisibility(input: { packageId: $id, visibility: PUBLIC }) {
-                clientMutationId
-              }
-            }' -f id="$PKG_ID"
+          echo "User container packages:"
+          gh api /user/packages?package_type=container --jq '.[].name' || true
+          for PKG in chatterbox-tts-runpod genius-voice-chatterbox; do
+            echo "Trying public on package: ${PKG}"
+            if gh api --method PATCH "/user/packages/container/${PKG}/visibility" -f visibility=public; then
+              echo "Public OK: ${PKG}"
+              exit 0
+            fi
+          done
+          echo "Failed to set any package public"
+          exit 1
 
       - name: Verify anonymous pull metadata
         run: |
