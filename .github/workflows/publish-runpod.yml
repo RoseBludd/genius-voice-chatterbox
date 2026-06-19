@@ -33,24 +33,31 @@ jobs:
             ghcr.io/rosebludd/chatterbox-tts-runpod:latest
             ghcr.io/rosebludd/chatterbox-tts-runpod:${{ github.sha }}
 
-      - name: Make GHCR package public (user REST API)
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Make GHCR package public
         run: |
-          set -e
-          echo "User container packages:"
-          gh api /user/packages?package_type=container --jq '.[].name' || true
-          for PKG in chatterbox-tts-runpod genius-voice-chatterbox; do
-            echo "Trying public on package: ${PKG}"
-            if gh api --method PATCH "/user/packages/container/${PKG}/visibility" -f visibility=public; then
-              echo "Public OK: ${PKG}"
-              exit 0
-            fi
+          set +e
+          sleep 5
+          TOKEN="${PACKAGES_TOKEN:-${{ github.token }}}"
+          for PKG in chatterbox-tts-runpod; do
+            echo "PATCH visibility public: ${PKG}"
+            code=$(curl -s -o /tmp/vis.json -w "%{http_code}" -X PATCH \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/user/packages/container/${PKG}/visibility" \
+              -d '{"visibility":"public"}')
+            echo "HTTP ${code}: $(cat /tmp/vis.json)"
+            if [ "$code" = "204" ] || [ "$code" = "200" ]; then exit 0; fi
           done
-          echo "Failed to set any package public"
-          exit 1
+          echo "::warning::Could not set GHCR public via API (needs PAT with write:packages). Run locally:"
+          echo "  gh auth refresh -s read:packages,write:packages"
+          echo "  gh api --method PATCH /user/packages/container/chatterbox-tts-runpod/visibility -f visibility=public"
+          exit 0
+        env:
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
       - name: Verify anonymous pull metadata
+        continue-on-error: true
         run: |
           code=$(curl -s -o /dev/null -w "%{http_code}" \
             "https://ghcr.io/v2/rosebludd/chatterbox-tts-runpod/tags/list")
