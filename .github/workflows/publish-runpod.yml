@@ -32,3 +32,8 @@ jobs:
           tags: |
             ghcr.io/rosebludd/chatterbox-tts-runpod:latest
             ghcr.io/rosebludd/chatterbox-tts-runpod:${{ github.sha }}
+
+      - name: Make GHCR package public (RunPod must pull without auth)
+        run: gh api --method PATCH /orgs/RoseBludd/packages/container/chatterbox-tts-runpod/visibility -f visibility=public
+        env:
+          GH_TOKEN: ${{ github.token }}
