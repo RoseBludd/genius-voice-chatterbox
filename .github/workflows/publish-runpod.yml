@@ -16,7 +16,7 @@ jobs:
 
       - uses: docker/login-action@v3
         with:
-          username: genius_substrates
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_REGISTRY_CREDENTIAL }}
 
       - uses: docker/build-push-action@v6
@@ -25,12 +25,12 @@ jobs:
           file: Dockerfile.runpod
           push: true
           tags: |
-            genius_substrates/chatterbox-tts-runpod:latest
-            genius_substrates/chatterbox-tts-runpod:${{ github.sha }}
+            rosebludd/chatterbox-tts-runpod:latest
+            rosebludd/chatterbox-tts-runpod:${{ github.sha }}
 
       - name: Verify Docker Hub tag exists
         run: |
           code=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://hub.docker.com/v2/repositories/genius_substrates/chatterbox-tts-runpod/tags/latest")
+            "https://hub.docker.com/v2/repositories/rosebludd/chatterbox-tts-runpod/tags/latest")
           echo "Docker Hub latest tag HTTP ${code}"
           test "${code}" = "200"
