@@ -33,10 +33,7 @@ RUN git clone --depth 1 --branch stable https://github.com/travisvn/chatterbox-t
        transformers==4.46.3 s3tokenizer conformer diffusers accelerate huggingface_hub \
     && rm -rf /src
 
-RUN python -c "\
-import numpy, scipy, torch, torchaudio; \
-from chatterbox.tts import ChatterboxTTS; \
-print('ok', numpy.__version__, scipy.__version__, torch.__version__)"
+RUN python -c "import numpy, scipy, torch, torchaudio; from chatterbox.tts import ChatterboxTTS; print('ok', numpy.__version__, scipy.__version__, torch.__version__)"
 
 RUN curl -fsSL -o /app/voice-sample.mp3 \
     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" || true
